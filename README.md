@@ -58,25 +58,13 @@
 
 ---
 
-### 🎯 支持的设备
+### 🎯 当前适配
 
 | 设备 | 代号 | 芯片 | 内核版本 | 状态 |
 |------|------|------|----------|:----:|
-| Xiaomi K70e | **duchamp** | MT6897 (Dimensity 8300) | 6.1.138-android14-11 | ✅ |
-| Xiaomi 14 | **frankel** | SM8650 (SD 8 Gen 3) | 6.x | ✅ |
-| Xiaomi 14 Pro | **shennong** | SM8650 (SD 8 Gen 3) | 6.x | ✅ |
-| Xiaomi 14 Ultra | **aurora** | SM8650 (SD 8 Gen 3) | 6.x | ✅ |
-| Redmi K70 Pro | **manet** | SM8650 (SD 8 Gen 3) | 6.x | ✅ |
-| Redmi K70E | **duchamp** | MT6897 | 6.x | ✅ |
-| Xiaomi 13 | **fuxi** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| Xiaomi 13 Pro | **nuwa** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| Xiaomi 13 Ultra | **ishtar** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| Xiaomi 13T Pro | **corot** | MT6980 | 6.x | ✅ |
-| Xiaomi Pad 6S Pro | **sheng** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| Xiaomi Mix Fold 3 | **babylon** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| ... | ... | ... | ... | ✅ |
+| Redmi K70E | **duchamp** | MT6897 (Dimensity 8300) | 6.1.138-android14-11 | ✅ |
 
-> 完整列表见 `src/targets/` 目录。你的设备不在列表里？自己测偏移提 PR，本文盲不负责。
+> 其它机型见 `src/targets/` 目录（原项目包含的参考配置，未实际验证）。
 
 ---
 
@@ -302,20 +290,9 @@ A: はいはいわかりました草
 
 | Device | Codename | SoC | Kernel | Status |
 |--------|----------|-----|--------|:------:|
-| Xiaomi K70e | **duchamp** | MT6897 (Dimensity 8300) | 6.1.138-android14-11 | ✅ |
-| Xiaomi 13 | **fuxi** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| Xiaomi 13 Pro | **nuwa** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| Xiaomi 13 Ultra | **ishtar** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| Xiaomi 13T Pro | **corot** | MT6980 | 6.x | ✅ |
-| Xiaomi 14 | **frankel** | SM8650 (SD 8 Gen 3) | 6.x | ✅ |
-| Xiaomi 14 Pro | **shennong** | SM8650 (SD 8 Gen 3) | 6.x | ✅ |
-| Xiaomi 14 Ultra | **aurora** | SM8650 (SD 8 Gen 3) | 6.x | ✅ |
-| Redmi K70 Pro | **manet** | SM8650 (SD 8 Gen 3) | 6.x | ✅ |
-| Redmi K70E | **duchamp** | MT6897 | 6.x | ✅ |
-| Xiaomi Pad 6S Pro | **sheng** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
-| Xiaomi Mix Fold 3 | **babylon** | SM8550 (SD 8 Gen 2) | 6.x | ✅ |
+| Redmi K70E | **duchamp** | MT6897 (Dimensity 8300) | 6.1.138-android14-11 | ✅ |
 
-> Full list in `src/targets/`. Your device not listed? Measure offsets and submit a PR. Or don't. I'm not your tech support.
+> Other devices under `src/targets/` are reference configs from the original project, not verified.
 
 ---
 
