@@ -19,7 +19,7 @@
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Colorful-glassblock/duchamp-root?label=release&color=00FF88)
 ![GitHub last commit](https://img.shields.io/github/last-commit/Colorful-glassblock/duchamp-root?label=last%20commit)
 ![Platform](https://img.shields.io/badge/platform-MTK6897%2FMT6897%20%28Dimensity%208300%29-blue)
-![Android](https://img.shields.io/badge/Android-15%20%28API%2035%29-green)
+![Android](https://img.shields.io/badge/Android-16%20%28API%2036%29-green)
 ![Kernel](https://img.shields.io/badge/Kernel-6.1.138--android14--11-orange)
 ![License](https://img.shields.io/badge/license-WTFPL-brightgreen)
 
