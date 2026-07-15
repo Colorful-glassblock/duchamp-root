@@ -25,7 +25,7 @@ CORE_SRCS := \
   $(call pick_src,fops.c) \
   $(call pick_src,pipe.c) \
   src/root.c
-PRELOAD_SRCS := $(CORE_SRCS) src/preload.c src/su_blob.S src/ksud_blob.S src/wallpaper_blob.S
+PRELOAD_SRCS := $(CORE_SRCS) src/preload.c src/ksud_blob.S
 
 .DEFAULT_GOAL := preload
 

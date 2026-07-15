@@ -168,11 +168,6 @@ struct root_report {
   int setuid_errno;
   int setenforce_ret;
   int setenforce_errno;
-  int su_install_ret;
-  int su_install_errno;
-  pid_t su_daemon_pid;
-  int wallpaper_ret;
-  int wallpaper_errno;
 };
 
 struct root_shared {
@@ -334,9 +329,7 @@ extern struct root_shared *root_shared;
 extern int memfd_leak;
 
 int run_exploit(int argc, char **argv);
-int install_embedded_su(pid_t *daemon_pid);
 int install_embedded_ksud(void);
-int install_embedded_wallpaper(void);
 void read_first_line(const char *path, char *buf, size_t len);
 void log_startup_context(void);
 void log_slide_child_context(void);

@@ -76,8 +76,7 @@
 | 2. FOPS 劫持 | `pselect` 任意栈写 | FUTEX_CMP_REQUEUE_PI + 竞争条件改 ops 表 |
 | 3. 物理读写原语 | pipe_buffer ops 伪造 | 伪造 pipe_buf_ops → 获得任意内核 phys rw |
 | 4. 提权 | patch cred + seccomp + selinux | 改 cred uid=0、cap 全满、关 seccomp、关 selinux |
-| 5. 持久化 | 嵌入式 su daemon + KernelSU | 安装 su 守护进程 + 启动 ksud |
-| 6. 收尾 | 壁纸彩蛋 | 换上 710 解锁节限定壁纸 |
+| 5. 持久化 | 嵌入式 KernelSU | 写入并启动 ksud（KernelSU 守护进程） |
 
 ---
 
@@ -97,8 +96,8 @@
 ```
 用户: "为什么我的手机重启了？"
 preload.so: "别慌，我在提权。"
-用户: "那为什么显示壁纸变了？"
-preload.so: "710限定款，喜欢吗 QwQ"
+用户: "KernelSU 是什么？"
+preload.so: "就是你手机上现在跑的 root 管理器。"
 ```
 
 **KernelSU 集成**
@@ -132,9 +131,7 @@ ksud: "我是嵌入在 preload.so 里的。"
 4. **获得 phys rw** — 伪造 `pipe_buf_ops`，实现任意内核物理地址读写
 5. **修补 cred** — 找到 root child 进程的 cred，改 uid=0、cap 全满、sid=kernel
 6. **关安全机制** — 关 seccomp、清 TIF_SECCOMP、写 selinux enforce=0
-7. **安装 su** — 提取嵌入的 su 守护进程到 `/apex/com.android.virt/bin/su` 并启动
-8. **启动 KernelSU** — 提取嵌入的 ksud，启动 KernelSU 守护进程
-9. **换壁纸** — 换上 710 解锁节限定壁纸作为彩蛋
+7. **启动 KernelSU** — 提取嵌入的 ksud 到 `/data/local/tmp/ksud`，启动 KernelSU 守护进程
 
 ---
 
@@ -178,7 +175,7 @@ make PROJECT=duchamp
 ```
 ├── Makefile                      # 构建系统
 ├── assets/
-│   └── wallpaper.webp            # 710解锁节壁纸彩蛋
+│   └── (待补充)
 ├── build/
 │   └── embed/
 │       └── ksud                  # 嵌入的 KernelSU 守护进程二进制
@@ -189,10 +186,7 @@ make PROJECT=duchamp
     ├── slide.c                   # KASLR 侧信道泄漏
     ├── fops.c                    # FOPS 劫持
     ├── pipe.c                    # pipe_buffer 物理读写原语
-    ├── su_blob.S                 # 嵌入 su daemon 二进制
     ├── ksud_blob.S               # 嵌入 ksud 二进制
-    ├── wallpaper_blob.S          # 嵌入壁纸图片
-    ├── su_daemon.c               # su 守护进程源码
     ├── offset.h                  # 内核偏移通用头
     ├── common.h                  # 全局常量 + 函数声明
     ├── kernelsnitch/             # Kernelsnitch 绕过
@@ -243,8 +237,8 @@ A: Xiaomi 14 的代号之一是 `frankel` 开头的设备，不是 `shennong`。
 **Q: QwQ?**  
 A: 情绪稳定（假的）。
 
-**Q: 壁纸是什么？**  
-A: 710 解锁节限定款。你看 root 成功了就会发现壁纸变了。
+**Q: 有 su 吗？**  
+A: 没有，只有 KernelSU。需要 su 的话装个 KernelSU 管理器自己开。
 
 **Q: 支持其它机型吗？**  
 A: 看 `src/targets/` 目录。你的机型在里面就支持，不在就自己加。
@@ -304,8 +298,7 @@ A: はいはいわかりました草
 | 2. FOPS hijack | `pselect` arbitrary stack write | FUTEX_CMP_REQUEUE_PI race → overwrite ops table |
 | 3. Phys rw primitive | Forged `pipe_buf_ops` | Fake pipe buffer ops → arbitrary kernel physical rw |
 | 4. Escalation | Patch cred + seccomp + selinux | uid=0, full caps, disable seccomp, disable selinux |
-| 5. Persistence | Embedded su daemon + KernelSU | Install su daemon + launch ksud |
-| 6. Easter egg | Wallpaper | 710 Unlock Festival limited wallpaper |
+| 5. Persistence | Embedded KernelSU | Write and launch ksud (KernelSU daemon) |
 
 ---
 
@@ -325,8 +318,8 @@ Dev:  "710 Unlock Festival. Not unlocking BL, liberating phones."
 ```
 User: "Why did my phone reboot?"
 preload.so: "Don't panic, I'm escalating privileges."
-User: "Why is my wallpaper different?"
-preload.so: "710 Festival limited edition. Like it? QwQ"
+User: "Why is KernelSU on my phone?"
+preload.so: "I put it there. You're welcome."
 ```
 
 **KernelSU Integration**
@@ -360,9 +353,7 @@ Dev:  "710 is a Xiaomi 14 codename, not iPhone 14. Get out."
 4. **Get phys rw** — forge `pipe_buf_ops` for arbitrary kernel physical memory access
 5. **Patch cred** — find root child task, patch uid=0, full caps, kernel sid
 6. **Disable security** — patch seccomp, clear TIF_SECCOMP, selinux enforce=0
-7. **Install su** — extract embedded su daemon to `/apex/com.android.virt/bin/su` and launch
-8. **Launch KernelSU** — extract embedded ksud binary, start KernelSU daemon
-9. **Set wallpaper** — 710 Festival limited wallpaper as easter egg
+7. **Launch KernelSU** — extract embedded ksud to `/data/local/tmp/ksud`, start KernelSU daemon
 
 ---
 
@@ -403,11 +394,12 @@ make PROJECT=duchamp
 
 ```
 ├── Makefile
-├── assets/wallpaper.webp        # 710 Festival easter egg
+├── assets/
+│   └── (TBD)
 ├── build/embed/ksud             # Embedded KernelSU daemon
 └── src/
     ├── main.c, preload.c, root.c, slide.c, fops.c, pipe.c
-    ├── su_blob.S, ksud_blob.S, wallpaper_blob.S
+    ├── ksud_blob.S               # Embedded ksud binary
     ├── su_daemon.c, offset.h, common.h
     ├── kernelsnitch/            # Kernelsnitch bypass
     └── targets/                 # Device-specific target.h files
