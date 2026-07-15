@@ -1,0 +1,2 @@
+build/*/bin/preload.so
+build/embed/su_daemon_aarch64_pie
