@@ -21,7 +21,7 @@
 ![Platform](https://img.shields.io/badge/platform-MTK6897%2FMT6897%20%28Dimensity%208300%29-blue)
 ![Android](https://img.shields.io/badge/Android-16%20%28API%2036%29-green)
 ![Kernel](https://img.shields.io/badge/Kernel-6.1.138--android14--11-orange)
-![License](https://img.shields.io/badge/license-WTFPL-brightgreen)
+![License](https://img.shields.io/badge/license-GPLv3-blue)
 
 > ⚡ **Proud user of JetBrains Mono** ⚡  
 > This README uses JetBrains Mono exclusively. Comic Sans is forbidden.
