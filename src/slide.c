@@ -205,6 +205,25 @@ void slide_pselect_stack_copy(void) {
   close(pipefd[1]);
 }
 
+static long try_set_nice(int tid, int nice) {
+  struct local_sched_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.size = sizeof(attr);
+
+  attr.sched_policy = SCHED_BATCH;
+  attr.sched_nice = nice;
+  long ret = syscall(SYS_sched_setattr, tid, &attr, 0);
+  if (ret == 0) return 0;
+
+  attr.sched_policy = SCHED_OTHER;
+  attr.sched_nice = nice;
+  ret = syscall(SYS_sched_setattr, tid, &attr, 0);
+  if (ret == 0) return 0;
+
+  ret = syscall(SYS_setpriority, PRIO_PROCESS, tid, nice);
+  return ret;
+}
+
 void *slide_consumer_thread(void *arg __attribute__((unused))) {
   disable_rseq_for_thread();
   pin_to_core(CONSUMER_CORE);
@@ -245,7 +264,7 @@ void *slide_consumer_thread(void *arg __attribute__((unused))) {
     atomic_store(&slide_consume_enter_sched, entered);
     atomic_store(&slide_consume_calls, calls + 1);
     errno = 0;
-    long ret = sched_setattr_tid(tid, (calls % 19) + 1);
+    long ret = try_set_nice(tid, (calls % 19) + 1);
     int saved_errno = errno;
     atomic_store(&slide_consume_last_sched_ret, (int)ret);
     atomic_store(&slide_consume_last_sched_errno, saved_errno);
