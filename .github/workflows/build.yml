@@ -1,0 +1,44 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - duchamp
+          - blazer-CP2A.260605.012
+          - caiman-CP2A.260605.012
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup NDK r29
+        run: |
+          curl -sLo ndk.zip \
+            https://dl.google.com/android/repository/android-ndk-r29-linux.zip
+          unzip -q ndk.zip
+          mv android-ndk-r29 /opt/ndk-r29
+          rm ndk.zip
+
+      - name: Build preload.so
+        run: |
+          make PROJECT=${{ matrix.project }} \
+            ANDROID_NDK_HOME=/opt/ndk-r29 \
+            CC=/opt/ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: preload-${{ matrix.project }}
+          path: build/${{ matrix.project }}/bin/preload.so
