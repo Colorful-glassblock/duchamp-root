@@ -14,9 +14,7 @@ define pick_src
 $(if $(wildcard $(TARGET_DIR)/$(1)),$(TARGET_DIR)/$(1),src/$(1))
 endef
 
-EMBED_SU := $(EMBEDDIR)/su_daemon_aarch64_pie
 PRELOAD := $(OUTDIR)/preload.so
-WALLPAPER := assets/wallpaper.webp
 
 CORE_SRCS := \
   $(call pick_src,main.c) \
@@ -95,11 +93,7 @@ $(OUTDIR):
 $(EMBEDDIR):
 	mkdir -p $@
 
-$(EMBED_SU): src/su_daemon.c | $(EMBEDDIR)
-	$(TARGET_CC) $(TARGET_FLAGS) $(PIE_CFLAGS) $(TARGET_CFLAGS) \
-	  $< $(TARGET_PIE_LDFLAGS) -o $@
-
-$(PRELOAD): $(PRELOAD_SRCS) $(EMBED_SU) $(WALLPAPER) $(TARGET_HEADER) src/offset.h src/common.h src/kernelsnitch/*.h | $(OUTDIR)
+$(PRELOAD): $(PRELOAD_SRCS) $(TARGET_HEADER) src/offset.h src/common.h src/kernelsnitch/*.h | $(OUTDIR)
 	$(TARGET_CC) $(TARGET_FLAGS) $(SO_CFLAGS) $(WARN_CFLAGS) $(TARGET_CFLAGS) \
 	  $(PRELOAD_SRCS) $(TARGET_COMMON_LDFLAGS) \
 	  -shared -o $@ -pthread
@@ -113,8 +107,6 @@ info:
 	@echo "TARGET_COMMON_LDFLAGS=$(TARGET_COMMON_LDFLAGS)"
 	@echo "TARGET_PIE_LDFLAGS=$(TARGET_PIE_LDFLAGS)"
 	@echo "PRELOAD=$(PRELOAD)"
-	@echo "EMBED_SU=$(EMBED_SU)"
-	@echo "WALLPAPER=$(WALLPAPER)"
 	@echo "CORE_SRCS=$(CORE_SRCS)"
 
 list-projects:
