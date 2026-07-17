@@ -3,14 +3,16 @@ name: build
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   release:
     types: [published]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  preload:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,18 +26,52 @@ jobs:
           mv android-ndk-r29 /opt/ndk-r29
           rm ndk.zip
 
-      - name: Build preload.so (aarch64)
+      - name: Build preload.so
         run: |
           make PROJECT=duchamp \
-            ANDROID_NDK_HOME=/opt/ndk-r29 \
             CC=/opt/ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang
 
-      - name: Verify architecture
+      - name: Verify
         run: |
           file build/duchamp/bin/preload.so
+          sha256sum build/duchamp/bin/preload.so
 
-      - name: Upload preload.so
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: preload-duchamp-aarch64
           path: build/duchamp/bin/preload.so
+
+      - name: Upload to release (manual)
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/duchamp/bin/preload.so
+
+  autorelease:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: preload
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: preload-duchamp-aarch64
+          path: .
+
+      - name: Create or update release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest
+          name: Latest build (${{ github.sha }})  
+          commit: ${{ github.sha }}
+          body: "Automated build from commit ${{ github.sha }}"
+          artifacts: preload.so
+          allowUpdates: true
+          replacesArtifacts: true
+          token: ${{ secrets.GITHUB_TOKEN }}
