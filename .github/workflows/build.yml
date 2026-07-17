@@ -33,9 +33,16 @@ jobs:
       - name: Verify architecture
         run: |
           file build/duchamp/bin/preload.so
+          sha256sum build/duchamp/bin/preload.so
 
-      - name: Upload preload.so
+      - name: Upload preload.so (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: preload-duchamp-aarch64
           path: build/duchamp/bin/preload.so
+
+      - name: Upload preload.so (release)
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/duchamp/bin/preload.so
