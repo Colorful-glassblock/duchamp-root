@@ -169,9 +169,19 @@ void run_main_route_threads(void) {
   }
 }
 
+int opt_disabled_selinux;
+
 int run_exploit(int argc, char **argv) {
-  (void)argc;
-  (void)argv;
+  opt_disabled_selinux = 0;
+  char *env = getenv("DISABLE_SELINUX");
+  if (env != NULL && strcmp(env, "1") == 0) {
+    opt_disabled_selinux = 1;
+  }
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--disabled-selinux") == 0) {
+      opt_disabled_selinux = 1;
+    }
+  }
 
   disable_rseq_for_thread();
   set_unbuffer();

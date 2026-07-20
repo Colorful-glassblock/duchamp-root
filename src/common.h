@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <linux/futex.h>
 #include <linux/memfd.h>
+#include <linux/perf_event.h>
 #include <pthread.h>
 #include <sched.h>
 #include <signal.h>
@@ -48,7 +49,7 @@
 #define __ASHMEMIOC 0x77
 #define ASHMEM_SET_NAME _IOW(__ASHMEMIOC, 1, char[ASHMEM_NAME_LEN])
 
-#define MM_STRUCT_SZ 0x400
+#define MM_STRUCT_SZ 0x380
 #define MM_ORDER 3
 #define MM_PARTIALS 5
 #define CORE 0
@@ -327,6 +328,7 @@ extern pid_t root_child_pid;
 extern int root_ready_pipe[2];
 extern struct root_shared *root_shared;
 extern int memfd_leak;
+extern int opt_disabled_selinux;
 
 int run_exploit(int argc, char **argv);
 int install_embedded_ksud(void);

