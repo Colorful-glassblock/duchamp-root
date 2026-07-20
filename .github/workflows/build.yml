@@ -58,6 +58,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Make tag
+        id: tag
+        run: echo "value=release-${GITHUB_SHA::10}" >> $GITHUB_OUTPUT
+
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -67,8 +71,8 @@ jobs:
       - name: Create or update release
         uses: ncipollo/release-action@v1
         with:
-          tag: latest
-          name: Latest build (${{ github.sha }})
+          tag: ${{ steps.tag.outputs.value }}
+          name: Build ${{ steps.tag.outputs.value }}
           commit: ${{ github.sha }}
           body: "Automated build from commit ${{ github.sha }}"
           artifacts: preload.so
