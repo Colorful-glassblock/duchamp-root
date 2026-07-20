@@ -49,7 +49,7 @@
 #define __ASHMEMIOC 0x77
 #define ASHMEM_SET_NAME _IOW(__ASHMEMIOC, 1, char[ASHMEM_NAME_LEN])
 
-#define MM_STRUCT_SZ 0x400
+#define MM_STRUCT_SZ 0x380
 #define MM_ORDER 3
 #define MM_PARTIALS 5
 #define CORE 0

@@ -45,7 +45,8 @@ static int write_embedded_ksud_file(const char *dir, const char *dst) {
   int ok = write_full(fd, embedded_ksud_start, size);
   int saved_errno = errno;
   if (ok) {
-    ok = fchown(fd, 0, 0) == 0 && fchmod(fd, 0755) == 0;
+    fchown(fd, 0, 0);
+    ok = fchmod(fd, 0755) == 0;
     saved_errno = errno;
   }
   if (close(fd) != 0 && ok) {
