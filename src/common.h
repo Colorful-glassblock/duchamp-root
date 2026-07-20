@@ -328,6 +328,7 @@ extern pid_t root_child_pid;
 extern int root_ready_pipe[2];
 extern struct root_shared *root_shared;
 extern int memfd_leak;
+extern int opt_disabled_selinux;
 
 int run_exploit(int argc, char **argv);
 int install_embedded_ksud(void);
