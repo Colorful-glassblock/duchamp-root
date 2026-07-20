@@ -67,7 +67,7 @@ jobs:
       - name: Create or update release
         uses: ncipollo/release-action@v1
         with:
-          tag: latest
+          tag: ${{ github.sha }}
           name: Latest build (${{ github.sha }})
           commit: ${{ github.sha }}
           body: "Automated build from commit ${{ github.sha }}"
