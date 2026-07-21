@@ -3,6 +3,15 @@
 
 static struct kernelsnitch_shared_state *ks;
 static size_t mm_objs_per_slab;
+
+static int get_ksnitch_collisions(void) {
+  const char *arg = getenv("KSNITCH_COLLISIONS");
+  if (arg) {
+    int val = atoi(arg);
+    if (val > 0) return val;
+  }
+  return KSNITCH_COLLISIONS;
+}
 static unsigned char *skb_buf;
 static int reclaim_sv[2] = {-1, -1};
 static struct mm_ctx prepare_ctx;
@@ -25,7 +34,7 @@ char ashmem_path[256] = "/dev/ashmem";
 void setup_kernelsnitch(void) {
   int cpu_count = (int)sysconf(_SC_NPROCESSORS_ONLN);
   ks = kernelsnitch_setup(
-      MM_STRUCT_SZ, MM_ORDER, cpu_count, KSNITCH_COLLISIONS, 0, 0);
+      MM_STRUCT_SZ, MM_ORDER, cpu_count, get_ksnitch_collisions(), 0, 0);
 }
 
 int kernelsnitch_collisions_ready(void) {
@@ -558,7 +567,7 @@ uintptr_t prepare_kernel_page(int payload_mode) {
 
   int cpu_count = (int)sysconf(_SC_NPROCESSORS_ONLN);
   ks = kernelsnitch_setup(
-      MM_STRUCT_SZ, MM_ORDER, cpu_count, KSNITCH_COLLISIONS, 0, 0);
+      MM_STRUCT_SZ, MM_ORDER, cpu_count, get_ksnitch_collisions(), 0, 0);
 
   for (size_t i = 0; i < pre_ctx.mm_cnt; i++) {
     pre_ctx.childs[i] = clone_child();
