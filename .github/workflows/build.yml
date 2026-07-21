@@ -68,9 +68,6 @@ jobs:
           name: preload-duchamp-aarch64
           path: .
 
-      - name: Debug files
-        run: find . -name "preload*" -type f
-
       - name: Create or update release
         uses: ncipollo/release-action@v1
         with:
