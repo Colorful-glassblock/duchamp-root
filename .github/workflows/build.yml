@@ -75,7 +75,7 @@ jobs:
           name: Build ${{ steps.tag.outputs.value }}
           commit: ${{ github.sha }}
           body: "Automated build from commit ${{ github.sha }}"
-          artifacts: preload.so
+          artifacts: build/duchamp/bin/preload.so
           allowUpdates: true
           replacesArtifacts: true
           token: ${{ secrets.GITHUB_TOKEN }}
