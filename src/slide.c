@@ -21,6 +21,8 @@ static atomic_int slide_consume_calls;
 
 static int slide_word_shift;
 
+void *slide_consumer_thread(void *arg __attribute__((unused)));
+
 int slide_pselect_words_per_set(void) {
   int bits_per_word = (int)(8 * sizeof(unsigned long));
   return (SLIDE_PSELECT_NFDS + bits_per_word - 1) / bits_per_word;
