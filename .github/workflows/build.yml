@@ -68,6 +68,9 @@ jobs:
           name: preload-duchamp-aarch64
           path: .
 
+      - name: Debug files
+        run: find . -name "preload*" -type f
+
       - name: Create or update release
         uses: ncipollo/release-action@v1
         with:
@@ -75,7 +78,7 @@ jobs:
           name: Build ${{ steps.tag.outputs.value }}
           commit: ${{ github.sha }}
           body: "Automated build from commit ${{ github.sha }}"
-          artifacts: build/duchamp/bin/preload.so
+          artifacts: preload.so
           allowUpdates: true
           replacesArtifacts: true
           token: ${{ secrets.GITHUB_TOKEN }}
